@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "q2c.h"
+#include "point.hpp"
 
 using json = nlohmann::json;
 
@@ -20,8 +21,6 @@ static void TransformInPlace(json &glyph, double a, double b, double c, double d
 			}
 	// we have dereferenced the glyph. there is nothing to deal with `references`.
 }
-
-#include <iostream>
 
 static json Dereference(json glyph, const json &font)
 {
@@ -40,45 +39,6 @@ static json Dereference(json glyph, const json &font)
 
 	glyph.erase("references");
 	return glyph;
-}
-
-struct Point
-{
-	double x;
-	double y;
-
-	Point() : x(0), y(0) {}
-	Point(double x, double y) : x(x), y(y) {}
-	Point(const json &p) : x(p["x"]), y(p["y"]) {}
-	json ToJson(bool on)
-	{
-		return {{"x", x}, {"y", y}, {"on", on}};
-	}
-};
-
-Point operator+(Point a, Point b)
-{
-	return {a.x + b.x, a.y + b.y};
-}
-
-Point operator-(Point a, Point b)
-{
-	return {a.x - b.x, a.y - b.y};
-}
-
-Point operator/(Point a, double b)
-{
-	return {a.x / b, a.y / b};
-}
-
-Point operator*(double a, Point b)
-{
-	return {a * b.x, a * b.y};
-}
-
-double abs(Point a)
-{
-	return sqrt(a.x * a.x + a.y * a.y);
 }
 
 namespace ConstructCffPath
