@@ -3,12 +3,13 @@
 #include <iterator>
 #include <utility>
 
-#include "q2c.h"
 #include "point.hpp"
+#include "tt2ps.h"
 
 using json = nlohmann::json;
 
-static void TransformInPlace(json &glyph, double a, double b, double c, double d, double dx, double dy)
+static void TransformInPlace(json &glyph, double a, double b, double c,
+                             double d, double dx, double dy)
 {
 	if (glyph.find("contours") != glyph.end())
 		for (auto &contour : glyph["contours"])
@@ -19,10 +20,10 @@ static void TransformInPlace(json &glyph, double a, double b, double c, double d
 				point["x"] = a * x + c * y + dx;
 				point["y"] = b * x + d * y + dy;
 			}
-	// we have dereferenced the glyph. there is nothing to deal with `references`.
+	// we have dereferenced the glyph.
 }
 
-static json Dereference(json glyph, const json &font)
+static json Dereference(json glyph, const json &glyf)
 {
 	if (glyph.find("references") == glyph.end())
 		return glyph;
@@ -30,11 +31,13 @@ static json Dereference(json glyph, const json &font)
 
 	for (const auto &ref : glyph["references"])
 	{
-		json target = font["glyf"][std::string(ref["glyph"])];
+		json target = glyf[std::string(ref["glyph"])];
 		if (target.find("references") != target.end())
-			target = Dereference(std::move(target), font);
-		TransformInPlace(target, ref["a"], ref["b"], ref["c"], ref["d"], ref["x"], ref["y"]);
-		std::copy(target["contours"].begin(), target["contours"].end(), std::back_inserter(glyph["contours"]));
+			target = Dereference(std::move(target), glyf);
+		TransformInPlace(target, ref["a"], ref["b"], ref["c"], ref["d"],
+		                 ref["x"], ref["y"]);
+		std::copy(target["contours"].begin(), target["contours"].end(),
+		          std::back_inserter(glyph["contours"]));
 	}
 
 	glyph.erase("references");
@@ -78,10 +81,8 @@ void Finish(json &cubicContour)
 {
 	size_t length = cubicContour.size();
 	// cubicContour[0] is implicitly on-curve
-	if (
-		length >= 2 &&
-		cubicContour[length - 1]["on"] &&
-		abs(Point(cubicContour[0]) - cubicContour[length - 1]) < 1)
+	if (length >= 2 && cubicContour[length - 1]["on"] &&
+	    abs(Point(cubicContour[0]) - cubicContour[length - 1]) < 1)
 	{
 		cubicContour.erase(length - 1);
 		length--;
@@ -104,7 +105,8 @@ void Finish(json &cubicContour)
 
 static void SimpleCurve(Point *p, json &cubicContour)
 {
-	ConstructCffPath::Curve(cubicContour, (p[0] + 2 * p[1]) / 3, (2 * p[1] + p[2]) / 3, p[2]);
+	ConstructCffPath::Curve(cubicContour, (p[0] + 2 * p[1]) / 3,
+	                        (2 * p[1] + p[2]) / 3, p[2]);
 }
 
 /* reimplemented afdko’s ttread::combinePair
@@ -128,17 +130,19 @@ static int CombinePair(Point *p, json &cubicContour)
 			{
 				// ...that is straight...
 				if ((a * (p[0].x - p[1].x) + b * (p[0].y - p[1].y) < 0) ==
-					(a * (p[4].x - p[1].x) + b * (p[4].y - p[1].y) < 0))
+				    (a * (p[4].x - p[1].x) + b * (p[4].y - p[1].y) < 0))
 				{
 					// ...and without inflexion...
 					double d0 = (p[2].x - p[0].x) * (p[2].x - p[0].x) +
-								(p[2].y - p[0].y) * (p[2].y - p[0].y);
+					            (p[2].y - p[0].y) * (p[2].y - p[0].y);
 					double d1 = (p[4].x - p[2].x) * (p[4].x - p[2].x) +
-								(p[4].y - p[2].y) * (p[4].y - p[2].y);
+					            (p[4].y - p[2].y) * (p[4].y - p[2].y);
 					if (d0 <= 3 * d1 && d1 <= 3 * d0)
 					{
 						// ...and small segment length ratio; combine curve
-						ConstructCffPath::Curve(cubicContour, (4 * p[1] - p[0]) / 3, (4 * p[3] - p[4]) / 3, p[4]);
+						ConstructCffPath::Curve(cubicContour,
+						                        (4 * p[1] - p[0]) / 3,
+						                        (4 * p[3] - p[4]) / 3, p[4]);
 						p[0] = p[4];
 						return 1;
 					}
@@ -166,9 +170,9 @@ static int CombinePair(Point *p, json &cubicContour)
    3        1 0 1           0-2
    4        1 0 1 0         0-3
 */
-static json ConvertApprox(json glyph, const json &font)
+static json ConvertApprox(json glyph, const json &glyf)
 {
-	glyph = Dereference(std::move(glyph), font);
+	glyph = Dereference(std::move(glyph), glyf);
 	glyph.erase("instructions");
 	glyph.erase("LTSH_yPel");
 
@@ -178,7 +182,7 @@ static json ConvertApprox(json glyph, const json &font)
 			continue;
 
 		json cubicContour = json::array();
-		Point p[6];				// points: 0,2,4-on, 1,3-off, 5-tmp
+		Point p[6];             // points: 0,2,4-on, 1,3-off, 5-tmp
 		json::const_iterator q; // current point
 		auto beg = contour.cbegin();
 		auto end = --contour.cend();
@@ -326,20 +330,14 @@ void RoundInPlace(json &glyph)
 		}
 }
 
-json Quad2Cubic(json font, bool roundToInt)
+json Tt2Ps(const json &glyf, bool roundToInt)
 {
 	json glyfCubic;
-	for (json::const_iterator it = font["glyf"].cbegin(); it != font["glyf"].cend(); ++it)
+	for (const auto &[name, glyph] : glyf.items())
 	{
-		auto name = it.key();
-		auto glyph = it.value();
-		glyfCubic[name] = ConvertApprox(glyph, font);
+		glyfCubic[name] = ConvertApprox(glyph, glyf);
 		if (roundToInt)
 			RoundInPlace(glyfCubic[name]);
 	}
-	font["glyf"] = glyfCubic;
-
-	// otfcc needs something here to identify an OpenType/CFF font.
-	font["CFF_"] = R"({"isCID": false})"_json;
-	return font;
+	return glyfCubic;
 }
