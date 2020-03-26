@@ -6,7 +6,7 @@
 #include "point.hpp"
 #include "tt2ps.h"
 
-using json = nlohmann::json;
+using nlohmann::json;
 
 static void TransformInPlace(json &glyph, double a, double b, double c,
                              double d, double dx, double dy)
@@ -80,8 +80,8 @@ void Curve(json &cubicContour, Point p1, Point p2, Point p3)
 void Finish(json &cubicContour)
 {
 	size_t length = cubicContour.size();
-	// cubicContour[0] is implicitly on-curve
-	if (length >= 2 && cubicContour[length - 1]["on"] &&
+	// cubicContour[0] and cubicContour[-1] are implicitly on-curve
+	if (length >= 2 &&
 	    abs(Point(cubicContour[0]) - cubicContour[length - 1]) < 1)
 	{
 		cubicContour.erase(length - 1);
@@ -318,16 +318,6 @@ static json ConvertApprox(json glyph, const json &glyf)
 	}
 
 	return glyph;
-}
-
-void RoundInPlace(json &glyph)
-{
-	for (auto &contour : glyph["contours"])
-		for (auto &point : contour)
-		{
-			point["x"] = int(round(double(point["x"])));
-			point["y"] = int(round(double(point["y"])));
-		}
 }
 
 json Tt2Ps(const json &glyf, bool roundToInt)

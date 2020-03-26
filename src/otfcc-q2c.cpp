@@ -1,9 +1,6 @@
 #include <iostream>
-#include <regex>
 #include <streambuf>
 #include <string>
-
-#include <boost/format.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -39,6 +36,14 @@ string GetName(NameId id, const json &name)
 	return {};
 }
 
+inline string GetVersionString(double version)
+{
+	constexpr size_t buffLen = 4096;
+	char result[buffLen];
+	snprintf(result, buffLen, "%.3f", version);
+	return result;
+}
+
 void Quad2Cubic(json &font)
 {
 	font["glyf"] = Tt2Ps(font["glyf"], true);
@@ -56,7 +61,7 @@ void Quad2Cubic(json &font)
 	if ((nameString = GetName(NameId::Version, name)).size())
 		cff["version"] = nameString;
 	else
-		cff["version"] = (boost::format("%.3f") % double(head["fontRevision"])).str();
+		cff["version"] = GetVersionString(head["fontRevision"]);
 	if ((nameString = GetName(NameId::Copyright, name)).size())
 		cff["copyright"] = nameString;
 	if ((nameString = GetName(NameId::FullName, name)).size())
@@ -78,6 +83,7 @@ void Quad2Cubic(json &font)
 	cff["fontBBoxLeft"] = head["xMin"];
 	cff["fontBBoxRight"] = head["xMax"];
 	font["CFF_"] = cff;
+	font["maxp"]["version"] = 0x0.5p0,
 
 	// remove TT instructions
 	font.erase("cvt_");
