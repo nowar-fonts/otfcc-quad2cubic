@@ -364,7 +364,9 @@ static json Convert(json glyph, double error)
 		json::const_iterator q = beg;
 		s[0] = *q;
 		ConstructTtPath::Move(quadContour, s[0]);
-		auto advance = [beg, end](auto q) { return (q == end) ? beg : q + 1; };
+
+		// advance to next point, in reversed direction
+		auto advance = [beg, end](auto q) { return (q == beg) ? end : q - 1; };
 
 		while (cnt > 0)
 		{
@@ -378,7 +380,7 @@ static json Convert(json glyph, double error)
 			else
 			{
 				s[1] = *q;
-				q++; // it’s safe here
+				q--; // it’s safe here
 				s[2] = *q;
 				q = advance(q);
 				s[3] = *q;

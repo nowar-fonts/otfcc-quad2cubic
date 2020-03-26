@@ -203,7 +203,7 @@ static json ConvertApprox(json glyph, const json &glyf)
 		else
 		{
 			// start at mid-point
-			q = end;
+			q = beg;
 			cnt++;
 			p[0] = (Point(*beg) + *end) / 2;
 		}
@@ -211,8 +211,8 @@ static json ConvertApprox(json glyph, const json &glyf)
 
 		while (cnt--)
 		{
-			// advance to next point
-			q = (q == end) ? beg : q + 1;
+			// advance to next point, in reversed direction
+			q = (q == beg) ? end : q - 1;
 
 			if ((*q)["on"])
 			{
